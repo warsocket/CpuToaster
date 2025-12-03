@@ -3,8 +3,20 @@ use std::io;
 use std::io::Read;
 
 fn main() {
-    let mut handles = Vec::with_capacity(32);
-    for _ in 0..32{
+
+    //Check for AVX2
+    let avx2:bool = get_avx2();
+    if !avx2{
+        println!("Cpu doesn't support AVX2 - CPU Toaster needs avx2 to run!");
+        return;
+    }
+
+    //get amount of core so we knonw how manny threasd to spawn
+    let cores = get_core_count();
+
+    //Spawn the infinite hot workers
+    let mut handles = Vec::with_capacity(cores);
+    for _ in 0..cores{
         handles.push(std::thread::spawn(asm_wrap));
     }
 
@@ -12,14 +24,7 @@ fn main() {
     //     handle.join().unwrap();
     // }
 
-
-    let avx2:bool = get_avx2();
-    if !avx2{
-        println!("Cpu doesn't support AVX2 - CPU Toaster needs avx2 to run!");
-        return;
-    }
-
-    let cores = get_core_count();
+    //Primt message, and after enter (stdin input) continue to end of function, whiich temrinated main threadm and thus the process (including all hot workers)
     println!("Running CPU Toaster on {} cores.", cores);
     println!("Press Enter to stop and exit.");
     let _ = io::stdin().read(&mut [0u8]); // wait for Enter
@@ -103,7 +108,9 @@ extern "C" fn asm() -> usize{
         // "dec rcx",
         // "jnz 2b",
         // "loop 2b",
-        "jmp 2b",
+        "jmp 2b", //no branch misses, plus the coe is run till gets killed anyways
+
+        //This is not needed due to the inf loop, but ill leave it here just in, case (It doenst hurt)
 
         // Restore callee-saved registers YMM8-15
         "vmovdqu ymm8, [rsp + 0]",   // Restore YMM8
